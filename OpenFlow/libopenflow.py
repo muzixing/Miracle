@@ -19,6 +19,7 @@ Time:2014/5/7
 ###################
 # Data Structures #
 ###################
+OFP_DL_TYPE_NOT_ETH_TYPE = 0x05ff
 
 ofp_type = { 0: "OFPT_HELLO",
              1: "OFPT_ERROR",
