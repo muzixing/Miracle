@@ -35,25 +35,25 @@ def arp_reply_handler(pkt):
 	
 	if pkt_parsed.payload.psrc not in ARP_TABLE:
 		arp_add(pkt_parsed.payload) 		#add arp record
-		if pkt_parsed.payload.pdst in ARP_TABLE:
+	if pkt_parsed.payload.pdst in ARP_TABLE:
 
-			ETHER = copy.deepcopy(pkt_parsed)
-			ETHER.dst = pkt_parsed.payload.hwsrc
-			ETHER.src = pkt_parsed.payload.hwdst
-			ETHER.payload.op = 2#reply
-			ETHER.payload.hwdst = pkt_parsed.payload.hwsrc
-			ETHER.payload.hwsrc = ARP_TABLE[pkt_parsed.payload.pdst]
-			ETHER.payload.psrc = pkt_parsed.payload.pdst
-			ETHER.payload.pdst = pkt_parsed.payload.psrc
+		ETHER = copy.deepcopy(pkt_parsed)
+		ETHER.dst = pkt_parsed.payload.hwsrc
+		ETHER.src = pkt_parsed.payload.hwdst
+		ETHER.payload.op = 2#reply
+		ETHER.payload.hwdst = pkt_parsed.payload.hwsrc
+		ETHER.payload.hwsrc = ARP_TABLE[pkt_parsed.payload.pdst]
+		ETHER.payload.psrc = pkt_parsed.payload.pdst
+		ETHER.payload.pdst = pkt_parsed.payload.psrc
 
-			pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()/ETHER
-			pkt_out.payload.payload.port = pkt_in_msg.in_port
-			pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
-			pkt_out.payload.in_port = pkt_in_msg.in_port
-			pkt_out.payload.actions_len = 8
-			pkt_out.length = len(pkt_out)
-			print ">>>ARP_REPLY"
-			return pkt_out
-		else:
-			return None
+		pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()/ETHER
+		pkt_out.payload.payload.port = pkt_in_msg.in_port
+		pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
+		pkt_out.payload.in_port = pkt_in_msg.in_port
+		pkt_out.payload.actions_len = 8
+		pkt_out.length = len(pkt_out)
+		print ">>>ARP_REPLY"
+		return pkt_out
+	else:
+		return None
 
