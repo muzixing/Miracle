@@ -18,63 +18,51 @@ sock_dpid = {}
 fd_map = {}
 features_info = {} 
 
-
-# dpid->type    
-switch_info = {0:"ip", 1:"ip", 2:"wave", 3:"wave+ip",   4:"otn", 5:"otn+ip", 6:"otn+wave", 7: "wave+otn+ip"} # 1 otn; 2 otn->wave; 3 wave
-
-# port->grain+slot(otn)/wave length(wave)   no use!!
-host_info = {           #odu0      #odu1    #odu2
-                "otn":{1:(0,64), 2:(1,22), 3:(2,6), 4:(2,5)},
-                "otn+ip":{1:(0,64), 2:(1,22), 3:(2,6), 4:(2,5)},
-                "wave":{1:96, 2:95, 3:94}
-            }
-
-###########################################################################################
+########################################################################################
 
 def hello_handler(data,*arg):
 	rmsg = of.ofp_header(data)
 	if rmsg.version == 1:
-		print "OFPT_HELLO"
+		print ">>>OFPT_HELLO"
 		return of.ofp_header(data)
 	else:
-		print "HELLO_ERROR"
+		print ">>>HELLO_ERROR"
 		return None
 	
-
 def error_handler(data, *arg):
 	body = data[8:]
-	print "OFPT_ERROR"
+	print ">>>OFPT_ERROR"
 	of.ofp_error_msg(body).show()
 	return None
 
 def echo_request_handler(data,*arg):
-	print "OFPT_ECHO_REQUEST"
+	print ">>>OFPT_ECHO_REQUEST"
 	rmsg = of.ofp_header(data)
 	msg = of.ofp_header(type = 3,xid=rmsg.xid)
 	#msg.show()
 	return msg
 
 def echo_reply_handler(data,*arg):
-	print "OFPT_ECHO_REPLY"
+	print ">>>OFPT_ECHO_REPLY"
 	return None
 
 def vendor_handler(data,*arg):
-	print "OFPT_VENDOR"
+	print ">>>OFPT_VENDOR"
 	return None
 
 def features_request_handler(data,*arg):
 	rmsg = of.ofp_header(data)
-	print "OFPT_FEATURES_REQUEST"
+	print ">>>OFPT_FEATURES_REQUEST"
 	return of.ofp_header(type =5,xid =1)#xid =0
 
 def features_reply_handler(data,fd):
-	print "features_reply_handler"
+	print ">>>OFPT_FEATURES_REPLY"
 	body = data[8:]
 	msg = of.ofp_features_reply(body[0:24])                     #length of reply msg
 	port_info_raw = str(body[24:])                              #we change it into str so we can manipulate it.
 	port_info = {}
 
-	print "port number:",len(port_info_raw)/48, "total length:", len(port_info_raw)
+	print ">>>port number:",len(port_info_raw)/48, "total length:", len(port_info_raw)
 	for i in range(len(port_info_raw)/48):
 	    port= of.ofp_phy_port(port_info_raw[0+i*48:48+i*48])
 	    #port.show()
@@ -87,7 +75,7 @@ def features_reply_handler(data,fd):
 	return None
 
 def packet_in_handler(data,fd):
-	print "packet_in_handler"
+	print ">>>OFPT_PACKET_IN"
 	rmsg =of.ofp_header(data[0:8])
 	body = data[8:]
 	pkt_in_msg = of.ofp_packet_in(body)
@@ -96,46 +84,46 @@ def packet_in_handler(data,fd):
 	#pkt_parsed.show()
 	dpid = sock_dpid[fd][1]      #if there is not the key of sock_dpid[fd] ,it will be an error.
 
-	return l2_learning.switch(pkt)
+	return l2_learning.switch(pkt,dpid)
 
 def barrier_handler(data,*arg):
-	print "OFPT_BARRIER_REQUEST"
+	print ">>>OFPT_BARRIER_REQUEST"
 	rmsg =of.ofp_header(data[0:8])
 	body = data[8:]
 	msg = of.ofp_header(type = 18,xid = rmsg.xid) 
 	return msg
 
 def flow_removed_handler(data,*arg):
-	print "OFPT_FLOW_REMOVED"
+	print ">>>OFPT_FLOW_REMOVED"
 	return None
 
 def port_status_handler(data,*arg):
-	print "OFPT_PORT_STATUS"
+	print ">>>OFPT_PORT_STATUS"
 	return None
 def packet_out_handler(data,*arg):
-	print "OFPT_PACKET_OUT"
+	print ">>>OFPT_PACKET_OUT"
 	return None
 
 def flow_mod_handler(data, *arg):
-	print "OFPT_FLOW_MOD"
+	print ">>>OFPT_FLOW_MOD"
 	#we can do some thing here.
 	return None
 
 def port_mod_handler(data ,*arg):
-	print "OFPT_PORT_MOD"
+	print ">>>OFPT_PORT_MOD"
 	return None
 
 def stats_request_handler(data, *arg):
-	print "OFPT_STATS_REQUEST"
+	print ">>>OFPT_STATS_REQUEST"
 	return None
 
 def stats_reply_handler(data,*arg):
-	print "OFPT_STATS_REPLY:%d",len(data)
+	print ">>>OFPT_STATS_REPLY:%d",len(data)
 	rmsg = of.ofp_header(data[0:8])
 	body = data[8:]
 	# 1. parsing ofp_stats_reply
 	reply_header = of.ofp_stats_reply(body[:4])
-	reply_header.show()
+	#reply_header.show()
 	# 2.parsing ofp_flow_stats msg
 	if reply_header.type == 0:
 		reply_desc = of.ofp_desc_stats(body[4:])
@@ -201,26 +189,26 @@ def stats_reply_handler(data,*arg):
 	return None
 
 def barrier_request_handler(data,*arg):
-	print "OFPT_BARRIER_REQUEST"
+	print ">>>OFPT_BARRIER_REQUEST"
 	#no message body, the xid is the previous barrier request xid
 	return None
 
 def barrier_reply_handler(data, *arg):
-	print "OFPT_BARRIER_REPLY: ", rmsg.xid, "Successful"
+	print ">>>OFPT_BARRIER_REPLY: ", rmsg.xid, "Successful"
 	return None
 
 def get_config_request_handler(data, *arg):
-	print "OFPT_QUEUE_GET_CONFIG_REQUEST"
+	print ">>>OFPT_QUEUE_GET_CONFIG_REQUEST"
 	#not finished yet.
 	return None
 
 def get_config_reply_handler(data,*arg):
-	print "OFPT_QUEUE_GET_CONFIG_REPLY"
+	print ">>>OFPT_QUEUE_GET_CONFIG_REPLY"
 	#not finished yet
 	return None
 
 def cfeatrues_reply_handler(data,*arg):
-	print "OFPT_CFEATURES_REPLY"
+	print ">>>OFPT_CFEATURES_REPLY"
 	body = data[8:]
 	msg = of.ofp_cfeatures_reply(body[0:24])
 	#bind the dpid and type  (type,  dpid)
@@ -231,32 +219,34 @@ def cfeatrues_reply_handler(data,*arg):
 
 	port_info_raw = body[24:]            
 	port_info = {}
-	print "port number:",len(port_info_raw)/72, "total length:", len(port_info_raw)
+	print ">>>port number:",len(port_info_raw)/72, "total length:", len(port_info_raw)
 	for i in range(len(port_info_raw)/72):
 		port_info[i] = of.ofp_phy_cport(port_info_raw[i*72:72+i*72])
-		print "port_no:",port_info[i].port_no,"i:",i
+		print ">>>port_no:",port_info[i].port_no,"i:",i
 
 	return None
 
-def send_stats_request_handler(Type, flow_1, port =None):
-    flow =str(flow_1)
-    ofp_flow_wildcards=of.ofp_flow_wildcards(flow[8:12])
-    ofp_match =of.ofp_match(flow[12:48])
-    ofp_flow_mod =of.ofp_flow_mod(flow[48:72])
-    if len(flow)>=88:
-        action_header = of.ofp_action_header(flow[72:80])
-        action_output = of.ofp_action_output(flow[80:88])
-    #we need to send the stats request packets periodically
-    msg = { 0: of.ofp_header(type = 16, length = 12)/of.ofp_stats_request(type = 0),                            #Type of  OFPST_DESC (0) 
-            1: of.ofp_header(type = 16, length = 56)/of.ofp_stats_request(type =1)/ofp_flow_wildcards/ofp_match/of.ofp_flow_stats_request(out_port = ofp_flow_mod.out_port),                  #flow stats
-            2: of.ofp_header(type = 16, length =56)/of.ofp_stats_request(type = 2)/ofp_flow_wildcards/ofp_match/of.ofp_aggregate_stats_request(),                                  # aggregate stats request
-            3: of.ofp_header(type = 16, length = 12)/of.ofp_stats_request(type = 3),                            #Type of  OFPST_TABLE (0) 
-            4: of.ofp_header(type = 16, length =20)/of.ofp_stats_request(type = 4)/of.ofp_port_stats_request(port_no = port),   # port stats request    
-            5: of.ofp_header(type = 16, length =20)/of.ofp_stats_request(type =5)/of.ofp_queue_stats_request(), #queue request
-            6: of.ofp_header(type = 16, length = 12)/of.ofp_stats_request(type = 0xffff)                        #vendor request
-        }
-    print "OFPT_STATS_REQUEST"
-    return msg[Type]
+def send_stats_request_handler(Type, flow=None, port =None):
+	if flow == None:
+		flow = of.ofp_header()/of.ofp_flow_wildcards()/of.ofp_match()/of.ofp_flow_mod()
+	flow =str(flow)
+	ofp_flow_wildcards=of.ofp_flow_wildcards(flow[8:12])
+	ofp_match =of.ofp_match(flow[12:48])
+	ofp_flow_mod =of.ofp_flow_mod(flow[48:72])
+	if len(flow)>=88:
+		action_header = of.ofp_action_header(flow[72:80])
+		action_output = of.ofp_action_output(flow[80:88])
+	#we need to send the stats request packets periodically
+	msg = { 0: of.ofp_header(type = 16, length = 12)/of.ofp_stats_request(type = 0),                            #Type of  OFPST_DESC (0) 
+			1: of.ofp_header(type = 16, length = 56)/of.ofp_stats_request(type =1)/ofp_flow_wildcards/ofp_match/of.ofp_flow_stats_request(out_port = ofp_flow_mod.out_port),                  #flow stats
+			2: of.ofp_header(type = 16, length =56)/of.ofp_stats_request(type = 2)/ofp_flow_wildcards/ofp_match/of.ofp_aggregate_stats_request(),                                  # aggregate stats request
+			3: of.ofp_header(type = 16, length = 12)/of.ofp_stats_request(type = 3),                            #Type of  OFPST_TABLE (0) 
+			4: of.ofp_header(type = 16, length =20)/of.ofp_stats_request(type = 4)/of.ofp_port_stats_request(port_no = port),   # port stats request    
+			5: of.ofp_header(type = 16, length =20)/of.ofp_stats_request(type =5)/of.ofp_queue_stats_request(), #queue request
+			6: of.ofp_header(type = 16, length = 12)/of.ofp_stats_request(type = 0xffff)                        #vendor request
+			}
+	print ">>>OFPT_STATS_REQUEST"
+	return msg[Type]
 
 
 

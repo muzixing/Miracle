@@ -6,13 +6,12 @@ from scapy import *
 import Queue
 import time
 import sys
-sys.path.append('.')
+from threading import Timer
 
 from  OpenFlow import libopenflow as of
-from  OpenFlow import stats_request as stats
 import OpenFlow.ofp_handler as ofp_handler
-import OTNagent.MySetting as MySetting
-
+import database.timer_list as timer_list
+sys.path.append('.')
 """
 TODO:Define the OpenFlow packets handler functions
 Author:Licheng
@@ -20,29 +19,23 @@ Time:2014/5/5
 
 """
 
-
-
 fd_map = {}
 message_queue_map = {}
-period = MySetting.period
 
-global cookie
-cookie = 0
 global ready
 ready = 0
-count = 1
 ######################################################################################################################                
 def handle_connection(connection, address):
-        print "1 connection,", connection, address
+        print ">>>1 connection,", connection, address
 def client_handler(address, fd, events):
     sock = fd_map[fd]
     if events & io_loop.READ:
         data = sock.recv(1024)
         if data == '':
-            print "connection dropped"
+            print ">>>Connection dropped"
             io_loop.remove_handler(fd)
         if len(data)<8:
-            print "not a openflow message"
+            print ">>>Length of packet is too short"
         else:
             if len(data)>=8:
                 rmsg = of.ofp_header(data[0:8])
@@ -85,13 +78,14 @@ def client_handler(address, fd, events):
                 message_queue_map[sock].put(str(msg))
             io_loop.update_handler(fd, io_loop.WRITE)
         
-        global count
-        if ready and count % period == 0:
-            #print "send stats_requests"
+
+        if ready:
+
             flow =of.ofp_header()/of.ofp_flow_wildcards()/of.ofp_match()/of.ofp_flow_mod()
-            message_queue_map[sock].put(str(ofp_handler.send_stats_request_handler(1,flow)))  #the parameter is the type of stats request
-            count = 1
-        count+=1
+            send_stats_request =Timer(5,ofp_handler.send_stats_request_handler,(1,flow))
+            send_stats_request.start()
+
+            message_queue_map[sock].put(str())  #the parameter is the type of stats request
         
 
     #################################   We finish the actions of manipulateing  ################################
@@ -119,7 +113,7 @@ def connection_up(sock, fd, events):
     fd_map[connection.fileno()] = connection
     connection_handler = functools.partial(client_handler, address)
     io_loop.add_handler(connection.fileno(), connection_handler, io_loop.READ)
-    print "in connection_up: new switch", connection.fileno(), connection_handler
+    print ">>>connection_up: new switch", connection.fileno(), connection_handler
     message_queue_map[connection] = Queue.Queue()
 
 def new_sock(block):
@@ -141,5 +135,10 @@ if __name__ == '__main__':
     try:
         io_loop.start()
     except KeyboardInterrupt:
-        io_loop.stop()
-        print "quit" 
+        io_loop.stop()        
+        print ">>>quit" 
+
+        for timer in timer_list.timer_list:
+            timer.cancel()
+
+        sys.exit(0)

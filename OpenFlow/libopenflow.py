@@ -351,67 +351,63 @@ class ofp_match(Packet):
 
 
 def packet2match(pkt, in_port = None, spec_frags = False):
-  """
-  make the wildcards and match form pakcet. //pakcet is the data we recieved.
-  """
-  #pkt.show()
-  rmsg = pkt#of.ofp_header(data[0:8])
-  pkt_in_msg = pkt.payload#of.ofp_packet_in(data[8:])
-  if rmsg.type == 10:
+    """
+    make the wildcards and match form pakcet. //pakcet is the data we recieved.
+    """
+    #pkt.show()
+    rmsg = pkt#of.ofp_header(data[0:8])
+    pkt_in_msg = pkt.payload#of.ofp_packet_in(data[8:])
     in_port = pkt_in_msg.in_port
     pkt_parsed = pkt_in_msg.payload#Ether(pkt_in_msg.load)
-  match = ofp_match()
+    match = ofp_match()
 
-  if in_port is not None:
-    match.in_port = in_port
+    if in_port is not None:
+        match.in_port = in_port
 
-  match.dl_src = pkt_parsed.src
-  match.dl_dst = pkt_parsed.dst
-  match.dl_type = pkt_parsed.type
-  packet = pkt_parsed.payload
-
-  # Is this in the spec? 
-  if pkt_parsed.type < 1536:
-    #print "OFP_DL_TYPE_NOT_ETH_TYPE"
-    match.dl_type = OFP_DL_TYPE_NOT_ETH_TYPE
-  if pkt_parsed.type ==0x8100:
-    #print "0x8100"
+    match.dl_src = pkt_parsed.src
+    match.dl_dst = pkt_parsed.dst
     match.dl_type = pkt_parsed.type
-    match.dl_vlan = packet.vlan
-    packet = packet.next # goto IP
-  else:
-    #print "match.dl_vlan = 0xffff"
-    match.dl_vlan = 0xffff;
+    packet = pkt_parsed.payload
 
-  if isinstance(packet, IP):
-    #print "<<<<<IP>>>>>"
-    match.nw_src = packet.src
-    match.nw_dst = packet.dst
-    match.nw_proto = packet.proto
-    match.nw_tos = packet.tos
-      # This seems a bit strange, but see page 9 of the spec.
-    if isinstance(packet.payload, TCP) or isinstance(packet.payload, UDP):
-      #print "<<<<<TCP or UDP>>>>>"
-      match.tp_src = packet.sport
-      match.tp_dst = packet.dport
-    elif isinstance(packet.payload, ICMP):
-      #print "<<<<<ICMP>>>>>"
-      match.tp_src = packet.type
-      match.tp_dst = packet.code
+    # Is this in the spec? 
+    if pkt_parsed.type < 1536:
+        #print "OFP_DL_TYPE_NOT_ETH_TYPE"
+        match.dl_type = OFP_DL_TYPE_NOT_ETH_TYPE
+    if pkt_parsed.type ==0x8100:
+        #print "0x8100"
+        match.dl_type = pkt_parsed.type
+        match.dl_vlan = packet.vlan
+        packet = packet.next # goto IP
     else:
-      match.tp_dst = 0
-      match.tp_src = 0
+        #print "match.dl_vlan = 0xffff"
+        match.dl_vlan = 0xffff;
 
-    print "TP_SRC=TP_DST=0"      
+    if isinstance(packet, IP):
+        #print "<<<<<IP>>>>>"
+        match.nw_src = packet.src
+        match.nw_dst = packet.dst
+        match.nw_proto = packet.proto
+        match.nw_tos = packet.tos
+        # This seems a bit strange, but see page 9 of the spec.
+        if isinstance(packet.payload, TCP) or isinstance(packet.payload, UDP):
+            #print "<<<<<TCP or UDP>>>>>"
+            match.tp_src = packet.sport
+            match.tp_dst = packet.dport
+        elif isinstance(packet.payload, ICMP):
+            #print "<<<<<ICMP>>>>>"
+            match.tp_src = packet.type
+            match.tp_dst = packet.code
+        else:
+            match.tp_dst = 0
+            match.tp_src = 0
 
-  elif isinstance(packet, ARP):
-    #print "<<<<<ARP>>>>>"
-    if packet.ptype <= 255:
-      match.nw_proto = packet.ptype
-      match.nw_src = packet.psrc
-      match.nw_dst = packet.pdst
-  #match.show()
-  return match
+    elif isinstance(packet, ARP):
+        #print "<<<<<ARP>>>>>"
+        if packet.ptype <= 255:
+            match.nw_proto = packet.ptype
+            match.nw_src = packet.psrc
+            match.nw_dst = packet.pdst
+    return match
 
 #THE SIZE OF MATCH IS 40 BYTES
 ###################
@@ -606,6 +602,49 @@ class ofp_flow_mod(Packet):
                   #1<<2 bit is OFPFF_EMERG, used only switch disconnected with controller) 
                   ShortField("flags", 0)
                 ]
+#####################
+#create a flow
+
+#####################                
+def create_flow(pkt, outport =None):
+    wildcards = ofp_flow_wildcards(  OFPFW_NW_TOS=1,
+                                        OFPFW_DL_VLAN_PCP=1,
+                                        OFPFW_NW_DST_MASK=63,
+                                        OFPFW_NW_SRC_MASK=63,
+                                        OFPFW_TP_DST=1,
+                                        OFPFW_TP_SRC=1,
+                                        OFPFW_NW_PROTO=1,
+                                        OFPFW_DL_TYPE=1,
+                                        OFPFW_DL_VLAN=1,
+                                        OFPFW_IN_PORT=1,
+                                        OFPFW_DL_DST=0,
+                                        OFPFW_DL_SRC=0)
+    match = packet2match(pkt)
+    #print type(match)
+    rmsg = pkt#of.ofp_header(data[0:8])
+    pkt_in_msg = pkt.payload#of.ofp_packet_in(data[8:])
+    pkt_parsed = pkt_in_msg.payload#of.Ether(pkt_in_msg.load)
+    if outport:
+        out_port = outport
+    else:
+        out_port =0xfffb
+    flow_mod = ofp_flow_mod( cookie=0,
+                                command=0,
+                                idle_timeout=10,
+                                hard_timeout=30,
+                                out_port=out_port,
+                                buffer_id=pkt_in_msg.buffer_id,
+                                flags=1)
+    action = ofp_action_header(type=0,len=8)/ofp_action_output(type=0, port=out_port)
+    header = ofp_header(type = 14,xid = rmsg.xid)
+    flow_mod = header/wildcards/match/flow_mod/action
+    flow_mod.length = len(flow_mod)
+    return flow_mod
+
+
+
+
+
 #No. 15
 #header()/ofp_port_mod()
 class ofp_port_mod(object):

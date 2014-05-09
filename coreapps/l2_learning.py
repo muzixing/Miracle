@@ -1,4 +1,8 @@
 from OpenFlow import libopenflow as of
+from coreapps import arp_server as arp_server
+from database import flow_database as flow_database
+from threading import Timer
+from database import timer_list as timer_list
 
 """
 TODO:switch the packets by mactoport table.
@@ -7,65 +11,55 @@ Time:2014/5/7
 
 """
 
-mactoport = {}
+mactoport = {} #src_mac :in_port = dst_mac :out_port
+MAC_TIMEOUT = 600
+
+#____________________________________________________________
 
 def __init__():
 	pass
 
-def switch(pkt,*args):
-	#pkt.show()
+def switch(pkt,dpid,*args):
 	rmsg = pkt
-
 	pkt_in_msg = pkt.payload
 	pkt_parsed = pkt.payload.payload
 	
-	mactoport[pkt_parsed.src] = pkt_in_msg.in_port
+	
+	mactoport_add(src_mac = pkt_parsed.src, in_port = pkt_in_msg.in_port)
+	#print "mactoport",pkt_parsed.src
+	if pkt_parsed.payload.type == 0x0806 and pkt_parsed.payload.payload.op == 1:   #all ARP will be ARP REQUEST first.
+		if arp_server.arp_reply_handler(pkt):
+			return arp_server.arp_reply_handler(pkt)
 
-	if pkt_parsed.dst == "ff:ff:ff:ff:ff:ff":	
-		#pkt_parsed.show()	
+	if pkt_parsed.dst == "ff:ff:ff:ff:ff:ff":
 		pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
 		pkt_out.payload.payload.port = 0xfffb
 		pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
 		pkt_out.payload.in_port = pkt_in_msg.in_port
 		pkt_out.payload.actions_len = 8
-		pkt_out.length = 24
-		#pkt_out.show()
-		print "MULTICAST"
+		pkt_out.length = len(pkt_out)
+		print ">>>OFPT_PACKET_OUT"
 		return pkt_out
 	else:
-		print "create_flow"
-		return create_flow(pkt)
+		print ">>>OFPT_FLOW_MOD"
+		if pkt_parsed.dst in mactoport:
+			out_port = mactoport[pkt_parsed.dst]
+		else:
+			out_port = 0xfffb
+		flow_mod = of.create_flow(pkt, out_port)
+		flow_database.flow_add(flow_mod,dpid) 
+		return flow_mod
 
-def create_flow(pkt):
-	wildcards = of.ofp_flow_wildcards(	OFPFW_NW_TOS=1,
-										OFPFW_DL_VLAN_PCP=1,
-										OFPFW_NW_DST_MASK=63,
-										OFPFW_NW_SRC_MASK=63,
-										OFPFW_TP_DST=1,
-										OFPFW_TP_SRC=1,
-										OFPFW_NW_PROTO=1,
-										OFPFW_DL_TYPE=1,
-										OFPFW_DL_VLAN=1,
-										OFPFW_IN_PORT=0,
-										OFPFW_DL_DST=1,
-										OFPFW_DL_SRC=1)
-	match = of.packet2match(pkt)
-	#print type(match)
-	rmsg = pkt#of.ofp_header(data[0:8])
-	pkt_in_msg = pkt.payload#of.ofp_packet_in(data[8:])
-	pkt_parsed = pkt_in_msg.payload#of.Ether(pkt_in_msg.load)
-	if pkt_parsed.dst in mactoport:
-		out_port = mactoport[pkt_parsed.dst]
-	else:
-		out_port = 0xfffb
-	flow_mod = of.ofp_flow_mod(	cookie=0,
-								command=0,
-								idle_timeout=10,
-								hard_timeout=30,
-								out_port=out_port,
-								buffer_id=pkt_in_msg.buffer_id,
-								flags=1)
-	action = of.ofp_action_header(type=0,len=8)/of.ofp_action_output(type=0, port=out_port)
-	ofp_header = of.ofp_header(type = 14,length = 88,xid = rmsg.xid)
-	flow_mod = ofp_header/wildcards/match/flow_mod/action
-	return flow_mod
+
+def mactoport_delete(*src_mac):
+	print ">>>Delete the mactoport record"
+	del mactoport[src_mac]
+
+def mactoport_add(*src_mac,**in_port):
+	if src_mac not in mactoport:
+		print ">>>Add the mactoport record"
+		mactoport[src_mac] = in_port
+		mac_timer =Timer(MAC_TIMEOUT,mactoport_delete,src_mac)
+		mac_timer.start() 
+		timer_list.timer_list.append(mac_timer)
+
