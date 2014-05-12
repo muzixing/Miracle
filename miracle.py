@@ -24,6 +24,30 @@ message_queue_map = {}
 
 global ready
 ready = 0
+handler = { 0:ofp_handler.hello_handler,
+            1:ofp_handler.error_handler,
+            2:ofp_handler.echo_request_handler,
+            3:ofp_handler.echo_reply_handler,
+            4:ofp_handler.echo_reply_handler,
+            5:ofp_handler.features_request_handler,
+            6:ofp_handler.features_reply_handler,
+            7:None,
+            8:None,
+            9:None,
+            10:ofp_handler.packet_in_handler,
+            11:ofp_handler.flow_removed_handler,
+            12:ofp_handler.port_status_handler,
+            13:ofp_handler.packet_out_handler,
+            14:ofp_handler.flow_mod_handler,
+            15:ofp_handler.port_mod_handler,
+            16:ofp_handler.stats_request_handler,
+            17:ofp_handler.stats_reply_handler,#body
+            18:ofp_handler.barrier_request_handler,
+            19:ofp_handler.barrier_reply_handler,
+            20:ofp_handler.get_config_request_handler,
+            21:ofp_handler.get_config_reply_handler,
+            24:ofp_handler.cfeatrues_reply_handler #body
+            }
 ######################################################################################################################                
 def handle_connection(connection, address):
         print ">>>1 connection,", connection, address
@@ -41,53 +65,28 @@ def client_handler(address, fd, events):
                 rmsg = of.ofp_header(data[0:8])
                 #rmsg.show()
                 body = data[8:]
-            handler = { 0:ofp_handler.hello_handler,
-                        1:ofp_handler.error_handler,
-                        2:ofp_handler.echo_request_handler,
-                        3:ofp_handler.echo_reply_handler,
-                        4:ofp_handler.echo_reply_handler,
-                        5:ofp_handler.features_request_handler,
-                        6:ofp_handler.features_reply_handler,
-                        7:None,
-                        8:None,
-                        9:None,
-                        10:ofp_handler.packet_in_handler,
-                        11:ofp_handler.flow_removed_handler,
-                        12:ofp_handler.port_status_handler,
-                        13:ofp_handler.packet_out_handler,
-                        14:ofp_handler.flow_mod_handler,
-                        15:ofp_handler.port_mod_handler,
-                        16:ofp_handler.stats_request_handler,
-                        17:ofp_handler.stats_reply_handler,#body
-                        18:ofp_handler.barrier_request_handler,
-                        19:ofp_handler.barrier_reply_handler,
-                        20:ofp_handler.get_config_request_handler,
-                        21:ofp_handler.get_config_reply_handler,
-                        24:ofp_handler.cfeatrues_reply_handler #body
-                        }
             if rmsg.type == 0:
                 msg = handler[0] (data)
                 message_queue_map[sock].put(str(msg))
                 message_queue_map[sock].put(str(of.ofp_header(type = 5)))
             elif rmsg.type == 6:
                 handler[6] (data,fd)
-                global ready
-                ready = 1
+                #global ready
+                #ready = 1
             else:
                 msg = handler[rmsg.type] (data,fd)
                 message_queue_map[sock].put(str(msg))
             io_loop.update_handler(fd, io_loop.WRITE)
         
-
-        if ready:
-
-            flow =of.ofp_header()/of.ofp_flow_wildcards()/of.ofp_match()/of.ofp_flow_mod()
-            send_stats_request =Timer(5,ofp_handler.send_stats_request_handler,(1,flow))
-            send_stats_request.start()
-
-            message_queue_map[sock].put(str())  #the parameter is the type of stats request
         
+        #if ready:
 
+        #    flow =of.ofp_header()/of.ofp_flow_wildcards()/of.ofp_match()/of.ofp_flow_mod()
+        #    send_stats_request =Timer(5,ofp_handler.send_stats_request_handler,(1,flow))
+        #    send_stats_request.start()
+
+        #    message_queue_map[sock].put(str())  #the parameter is the type of stats request
+        
     #################################   We finish the actions of manipulateing  ################################
 
     if events & io_loop.WRITE:

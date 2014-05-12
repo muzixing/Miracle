@@ -1,4 +1,0 @@
-Controller
-==========
-
-My OpenFlow controller

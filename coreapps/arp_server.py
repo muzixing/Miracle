@@ -18,25 +18,24 @@ ARP_TABLE = {}#Using for record the ARP
 def __init__():
 	pass
 
-def arp_delete(ARP):
+def arp_delete(psrc):
 	#print ">>>Delete the ARP record"
-	del ARP_TABLE[ARP.psrc]
+	del ARP_TABLE[psrc]
 
-def arp_add(ARP):
+def arp_add(psrc,*hwsrc):
 	#print ">>>Add the ARP record"
-	ARP_TABLE[ARP.psrc] = ARP.hwsrc
-	arp_timer =Timer(idle_time,arp_delete,ARP)
-	arp_timer.start()
-	timer_list.timer_list.append(arp_timer) 
+	ARP_TABLE[psrc] = hwsrc
+	#arp_timer =Timer(idle_time,arp_delete,psrc)
+	#arp_timer.start()
+	#timer_list.timer_list.append(arp_timer) 
 
 def arp_reply_handler(pkt):
 	pkt_in_msg =pkt.payload
 	pkt_parsed =pkt_in_msg.payload
 	
 	if pkt_parsed.payload.psrc not in ARP_TABLE:
-		arp_add(pkt_parsed.payload) 		#add arp record
+		arp_add(pkt_parsed.payload.psrc,pkt_parsed.payload.hwsrc) 		#add arp record
 	if pkt_parsed.payload.pdst in ARP_TABLE:
-
 		ETHER = copy.deepcopy(pkt_parsed)
 		ETHER.dst = pkt_parsed.payload.hwsrc
 		ETHER.src = pkt_parsed.payload.hwdst
@@ -52,7 +51,6 @@ def arp_reply_handler(pkt):
 		pkt_out.payload.in_port = pkt_in_msg.in_port
 		pkt_out.payload.actions_len = 8
 		pkt_out.length = len(pkt_out)
-		print ">>>ARP_REPLY"
 		return pkt_out
 	else:
 		return None

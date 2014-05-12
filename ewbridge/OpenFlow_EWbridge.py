@@ -17,6 +17,7 @@ ports = {}
 links = {}
 flow_paths = {}
 
+
 def update_handler(data):
     #manipulate the messenge
     print "update_handler"
@@ -25,51 +26,40 @@ def update_handler(data):
     update_msg = ofpew.ofpew_update(data[0:8])
     data = data[8:]                  
     for x in xrange(update_msg.network_number):
-        offset = 0
         network_view = ofpew.ofpew_network_view(data[0:16])
         network[x] = network_view               #store the network_view
         network_view.show()
-
-        #offset = 16+network_view.node_number*28+network_veiw.link_number*48 +network_view.port_number*36 +network_view.flow_path_number*60
-        offset = 16
-        data = data[offset:]
+        data = data[16:]
 
         #we need to make sure the offset of network object.
 
         for i in xrange(network_view.node_number):
             #store the nodes of this network
-            node_t =  ofpew.ofpew_node(data[(i-1)*28:i*28]) 
+            node_t =  ofpew.ofpew_node(data[0:*28]) 
             #node_t.show()
             nodes[node_t.datapath_id] = node_t
-
-        offset = 28*network_view.node_number
-        data = data[offset:]
+            data =data[28:]
 
         for k in xrange(network_view.port_number):
             #store the ports of this network
-            port_t =  ofpew.ofpew_port(data[(k-1)*36:k*36]) 
+            port_t =  ofpew.ofpew_port(data[0:36]) 
             #port_t.show()
             ports[port_t.port_id] = port_t
+            data = data[36:]
 
-        offset = 36*network_view.port_number
-        data = data[offset:]
         for j in xrange(network_view.link_number):
             #store the links of this network
-            link_t =  ofpew.ofpew_link(data[(j-1)*48:j*48]) 
+            link_t =  ofpew.ofpew_link(data[0:48]) 
             #link_t.show()
             links[link_t.link_id] = link_t
+            data = data[48:]
 
-        offset = 48*network_view.link_number
-        data = data[offset:]
         for y in xrange(network_view.flow_path_number):
             #store the flwo_paths of this network
-            flow_path_t =  ofpew.ofpew_flow_path(data[(y-1)*60:y*60]) 
+            flow_path_t =  ofpew.ofpew_flow_path(data[0:60]) 
             #flow_path_t.show()
             flow_paths[flow_path_t.flow_path_id] = flow_path_t
-
-        offset = 60* network_view.flow_path_number
-        data = data[offset:]
-
+            data =data[60:]
     return None
 
 def notification_handler(data):
@@ -88,9 +78,6 @@ def refresh_handler(data):
     port_number = 4
     link_number = 1
     flow_path_number = 1
-    length = len(ofpew.ofpew_header())+len(ofpew.ofpew_update())+len(ofpew.ofpew_network_view())*network_number+len(ofpew.ofpew_node())*node_number+len(ofpew.ofpew_port())*port_number\
-            +len(ofpew.ofpew_link())*link_number+len(ofpew.ofpew_flow_path())*flow_path_number
-
     update_msg = ofpew.ofpew_update(network_number = network_number)
     network_msg = ofpew.ofpew_network_view(node_number = node_number, port_number = port_number,
                                         link_number = link_number,flow_path_number = flow_path_number)
@@ -106,16 +93,17 @@ def refresh_handler(data):
 
     flow_path_msg = ofpew.ofpew_flow_path(flow_path_id = 1, src_in_port_id =3,src_node_id =1, src_out_port_id = 1,
                         dst_node_id = 2,dst_in_port_id = 2 ,dst_out_port_id = 4)
-    header = ofpew.ofpew_header(type = 5, length =length)
+    header = ofpew.ofpew_header(type = 5)
 
     #we encapsulate the packet.
     msg = header/update_msg/network_msg/node_msg_1/node_msg_2/port_msg_1/port_msg_2/port_msg_3/port_msg_4/link_msg/flow_path_msg
+    msg.length = len(msg)
     print "*****\n send update messages\n*****"
     msg.show()
     return msg
-def hello_handler(data):
+def hello_handler():
     print "OFPEW_HELLO"
-    return data
+    return None
 
 def echo_handler():#send echo request.
     print "OFPEW_ECHO_REQUEST"
@@ -146,22 +134,11 @@ def error_handler(data):
 def msg_handler(data):
     rmsg = ofpew.ofpew_header(data[0:8])
     body = data[8:]
-    handler = { 0:hello_handler,
-                1:error_handler,
-                2:echo_request_handler,
-                3:echo_reply_handler,
-                4:vendor_handler,
-                5:update_handler,
-                6:notification_handler,
-                7:refresh_handler,
-                8:down_handler
-    }
-    return (handler[rmsg.type] (data))
-"""
+
     if rmsg.type == 0:
         #"OFPEW_HELLO"
-        msg = hello_handler(data)
-        return msg  #say hello
+        hello_handler()
+        return refresh_handler(data)  #send the topo
         
     elif rmsg.type == 1:
         # "OFPEW_ERROR"
@@ -197,4 +174,3 @@ def msg_handler(data):
     elif rmsg.type == 8:
         #"OFPEW_GOING_DOWN"
         return down_handler(data)    
-"""
