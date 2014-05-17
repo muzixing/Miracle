@@ -53,5 +53,11 @@ def arp_reply_handler(pkt):
 		pkt_out.length = len(pkt_out)
 		return pkt_out
 	else:
-		return None
+		pkt_out = of.ofp_header()/of.ofp_pktout_header()/of.ofp_action_output()
+		pkt_out.payload.payload.port = 0xfffb
+		pkt_out.payload.buffer_id = pkt_in_msg.buffer_id
+		pkt_out.payload.in_port = pkt_in_msg.in_port
+		pkt_out.payload.actions_len = 8
+		pkt_out.length = len(pkt_out)
+		return pkt_out
 

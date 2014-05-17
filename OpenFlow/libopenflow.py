@@ -910,12 +910,6 @@ class ofp_connect(Packet):
     
 bind_layers( ofp_connect_wildcards, ofp_connect)
 
-
-
-
-
-
-
 ####################
 # Useful Functions #
 ####################

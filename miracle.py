@@ -48,7 +48,7 @@ handler = { 0:ofp_handler.hello_handler,
             21:ofp_handler.get_config_reply_handler,
             24:ofp_handler.cfeatrues_reply_handler #body
             }
-######################################################################################################################                
+
 def handle_connection(connection, address):
         print ">>>1 connection,", connection, address
 def client_handler(address, fd, events):
@@ -77,8 +77,7 @@ def client_handler(address, fd, events):
                 msg = handler[rmsg.type] (data,fd)
                 message_queue_map[sock].put(str(msg))
             io_loop.update_handler(fd, io_loop.WRITE)
-        
-        
+                
         #if ready:
 
         #    flow =of.ofp_header()/of.ofp_flow_wildcards()/of.ofp_match()/of.ofp_flow_mod()

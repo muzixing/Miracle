@@ -22,6 +22,6 @@ def flow_add(flow,*dpid):
 	if dpid not in flow_table_cache:
 		#print ">>>Add the flow entry"	
 		flow_table_cache.append({dpid:flow})
-		flow_timer =Timer(flow.payload.payload.payload.hard_timeout,flow_delete,dpid)
+		#flow_timer =Timer(flow.payload.payload.payload.hard_timeout,flow_delete,dpid)
 		#flow_timer.start() 
-		timer_list.timer_list.append(flow_timer)
+		#timer_list.timer_list.append(flow_timer)
