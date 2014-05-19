@@ -197,15 +197,19 @@ def barrier_reply_handler(data, *arg):
 	#print ">>>OFPT_BARRIER_REPLY: ", rmsg.xid, "Successful"
 	return None
 
-def get_config_request_handler(data, *arg):
-	#print ">>>OFPT_QUEUE_GET_CONFIG_REQUEST"
-	#not finished yet.
+def get_config_request_handler(data):#7
+	print "get_config_request_handler"
+	return ofp_header(type=7)
+
+def get_config_reply_handler(data):#8
 	return None
 
-def get_config_reply_handler(data,*arg):
-	#print ">>>OFPT_QUEUE_GET_CONFIG_REPLY"
-	#not finished yet
-	return None
+def set_config_handler(data):#9
+	print "set_config_handler"
+	return ofp_header(type=9,length = 20)/of.switch_config()
+
+
+
 
 def cfeatrues_reply_handler(data, fd, *arg):
 	#print ">>>OFPT_CFEATURES_REPLY"
@@ -247,6 +251,18 @@ def send_stats_request_handler(Type, flow=None, port =None):
 			}
 	#print ">>>OFPT_STATS_REQUEST"
 	return msg[Type]
+
+def queue_get_config_request_handler(data, *arg):
+	#print ">>>OFPT_QUEUE_GET_CONFIG_REQUEST"
+	#not finished yet.
+	return None
+
+def queue_get_config_reply_handler(data,*arg):
+	#print ">>>OFPT_QUEUE_GET_CONFIG_REPLY"
+	#not finished yet
+	return None
+
+
 
 
 

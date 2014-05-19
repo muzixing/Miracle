@@ -3,19 +3,17 @@ import functools
 import socket
 import threading
 import Queue
-import time
+import time,signal,os,traceback
 import sys
-
 from threading import Timer
 from scapy import *
-
 
 from  OpenFlow import libopenflow as of
 import OpenFlow.ofp_handler as ofp_handler
 import database.timer_list as timer_list
 sys.path.append('.')
 """
-TODO:class miracle
+TODO: Multithread miracle
 Author:Licheng
 Time:2014/5/17
 
@@ -81,82 +79,88 @@ class miracle(object):
     def handle_connection(self,connection, address):
             print ">>>connection up,", connection, address
 
+    def recv_handler(self,fd_map,message_queue_map):
+        for fd in fd_map.keys():
+            self.fd_lock.acquire()
+            sock = fd_map[fd]
+            self.fd_lock.release()
+
+            self.sock_lock.acquire()
+            print "sock_lock by recv_message"
+            data = sock.recv(1024)
+            self.sock_lock.release()
+            print "sock_unlock by recv_message"
+
+            if data == '':
+                print ">>>Connection dropped"
+                self.fd_lock.acquire()
+                del fd_map[fd]
+                #sock.close()
+                self.fd_lock.release()
+                self.queue_lock.acquire()
+                del message_queue_map[sock]
+                self.queue_lock.release()
+            if len(data)<8:
+                print ">>>Length of packet is too short"
+            else:
+                if len(data)>=8:
+                    rmsg = of.ofp_header(data[0:8])
+                    body = data[8:]
+                if rmsg.type == 0:
+                    msg = self.handler[0] (data)
+                    self.queue_lock.acquire()
+                    print "hello queue_lock by recv_message"
+                    message_queue_map[sock].put(str(msg))
+                    message_queue_map[sock].put(str(of.ofp_header(type = 5)))
+                    self.queue_lock.release()
+                    print "hello queue_unlock by recv_message"
+                elif rmsg.type == 6:
+                    self.handler[6] (data,fd)
+                else:
+                    msg = self.handler[rmsg.type] (data,fd)
+                    queue_lock.acquire()
+                    print "other queue_lock by recv_message"
+                    message_queue_map[sock].put(str(msg))
+                    queue_lock.release()
+                    print "other queue_unlock by recv_message"
+
     def recv_message(self,fd_map,message_queue_map):
         while self.run:
-            #print "run recv_message"
-            try:    
-                for fd in fd_map:
-                    #print "try_recv_message "
-                    self.fd_lock.acquire()
-                    sock = fd_map[fd]
-                    self.fd_lock.release()
-
-                    self.queue_lock.acquire()
-                    data = sock.recv(1024)
-                    self.queue_lock.release()
-
-                    if data == '':
-                        print ">>>Connection dropped"
-                        self.fd_lock.acquire()
-                        fd_map.remove(fd)
-                        self.fd_lock.release()
-                    if len(data)<8:
-                        print ">>>Length of packet is too short"
-                    else:
-                        if len(data)>=8:
-                            rmsg = of.ofp_header(data[0:8])
-                            body = data[8:]
-                        if rmsg.type == 0:
-                            msg = self.handler[0] (data)
-                            self.queue_lock.acquire()
-                            message_queue_map[sock].put(str(msg))
-                            message_queue_map[sock].put(str(of.ofp_header(type = 5)))
-                            self.queue_lock.release()
-                        elif rmsg.type == 6:
-                            self.handler[6] (data,fd)
-                        else:
-                            msg = self.handler[rmsg.type] (data,fd)
-                            queue_lock.acquire()
-                            message_queue_map[sock].put(str(msg))
-                            queue_lock.release()
-            except KeyboardInterrupt:
-                print ">>>quit"
-                sys.exit(0)
+            try:
+                self.recv_handler(fd_map,message_queue_map)
+            except socket.error, e:
+                print e
+                continue
 
     def send_message(self,message_queue_map):
         while self.run:
-            self.queue_lock.acquire()
-            for sock in message_queue_map:
-                
+            for sock in message_queue_map.keys():
                 try:
-                    #print "try send_message"
+                    self.queue_lock.acquire(1)
+                    #print "queue_lock by send_message"
                     next_msg = message_queue_map[sock].get_nowait()
-                except KeyboardInterrupt:
-                    print ">>>quit"
-                    sys.exit(0)
+                    self.queue_lock.release()
+                    print "queue_unlock by send_message"
                 except Queue.Empty:
-                    pass
+                    self.queue_lock.release()
+                    #print "queue_unlock by queue_empty"
+                    continue
                 else:
                     print "send_next_msg"
-                    #self.sock_lock.acquire()
+                    self.sock_lock.acquire()
                     sock.send(next_msg)
-                    #self.sock_lock.release()
-            self.queue_lock.release()
+                    self.sock_lock.release()
 
     def connection_up(self, sock):
         def accept_loop():
             try:
                 connection, address = sock.accept()
-                
-            except KeyboardInterrupt:
-                print ">>>quit"
-                sys.exit(0)
             except socket.error, e:
                 if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
                     raise
                 return
             self.handle_connection(connection, address)
-            connection.setblocking(0)
+            connection.setblocking(1)#if I set it  as 0 ,and then I will got the error 11:resource is unavliable.
             self.fd_lock.acquire()
             self.fd_map[connection.fileno()] = connection
             self.fd_lock.release()
@@ -169,9 +173,7 @@ class miracle(object):
             try:
                 accept_loop()
             except KeyboardInterrupt:
-                print "break"
                 sys.exit(0)
-                break
 
     def new_sock(self,block):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
@@ -185,13 +187,11 @@ class miracle(object):
         sock.listen(listen)
 
         threads = []
+
         t_connection = miracle_thread(func = self.connection_up, args =(sock,),name = "connection")
-        #t_connection = threading.Thread(target=self.connection_up, args=(sock,)) 
         threads.append(t_connection)
-        #t_recv = threading.Thread(target=self.recv_message, args=(self.fd_map,self.message_queue_map))
         t_recv = miracle_thread(func=self.recv_message, args=(self.fd_map,self.message_queue_map),name = "recv_message") 
         threads.append(t_recv)
-        #t_send = threading.Thread(target=self.send_message, args=(self.message_queue_map,))
         t_send = miracle_thread(func=self.send_message, args=(self.message_queue_map,),name = "send_message") 
         threads.append(t_send)
 
@@ -202,11 +202,47 @@ class miracle(object):
         for thread in threads:  
             thread.join()
             print "join"
-        
+
+class Watcher:  
+    """this class solves two problems with multithreaded 
+    programs in Python, (1) a signal might be delivered 
+    to any thread (which is just a malfeature) and (2) if 
+    the thread that gets the signal is waiting, the signal 
+    is ignored (which is a bug). 
+ 
+    The watcher is a concurrent process (not thread) that 
+    waits for a signal and the process that contains the 
+    threads. 
+    """  
+  
+    def __init__(self):  
+        """ Creates a child thread, which returns.  The parent 
+            thread waits for a KeyboardInterrupt and then kills 
+            the child thread. 
+        """  
+        self.child = os.fork()  
+        if self.child == 0:  
+            return  
+        else:  
+            self.watch()  
+  
+    def watch(self):  
+        try:  
+            os.wait()  
+        except KeyboardInterrupt:
+            print "\n"
+            self.kill()  
+        sys.exit()  
+  
+    def kill(self):  
+        try:  
+            os.kill(self.child, signal.SIGKILL)  
+        except OSError: pass  
+
 if __name__ == '__main__':
     miracle_muti = miracle(1)
     try:
+        Watcher()
         miracle_muti.start_up()
     except KeyboardInterrupt:
-        print ">>>quit" 
         sys.exit(0)
