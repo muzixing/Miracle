@@ -1,6 +1,7 @@
 import errno
 import functools
 import socket
+import select
 import threading
 import Queue
 import time,signal,os,traceback
@@ -151,24 +152,30 @@ class miracle(object):
                     sock.send(next_msg)
                     self.sock_lock.release()
 
-    def connection_up(self, sock):
+    def connection_up(self, listener, sockets):
         def accept_loop():
-            try:
-                connection, address = sock.accept()
-            except socket.error, e:
-                if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
-                    raise
-                return
-            self.handle_connection(connection, address)
-            connection.setblocking(1)#if I set it  as 0 ,and then I will got the error 11:resource is unavliable.
-            self.fd_lock.acquire()
-            self.fd_map[connection.fileno()] = connection
-            self.fd_lock.release()
+            rlist, wlist, elist = select.select(sockets, [], sockets, 120)
+            print("select works")
+            for new_socket in rlist:
+                if new_socket is listener:
+                    try:
+                        connection, address = new_socket.accept()
+                    except socket.error, e:
+                        if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
+                            raise
+                        return
+                    connection.setblocking(0)#if I set it  as 0 ,and then I will got the error 11:resource is unavliable.
+                    sockets.append(connection)
+                else:
+                    self.handle_connection(connection, address)
+                    self.fd_lock.acquire()
+                    self.fd_map[connection.fileno()] = connection
+                    self.fd_lock.release()
 
-            self.queue_lock.acquire()
-            self.message_queue_map[connection] = Queue.Queue()
-            self.queue_lock.release()
-            #sleep(1)
+                    self.queue_lock.acquire()
+                    self.message_queue_map[connection] = Queue.Queue()
+                    self.queue_lock.release()
+                    sleep(1)
         while self.run:
             try:
                 accept_loop()
@@ -182,13 +189,15 @@ class miracle(object):
         return sock  
 
     def start_up(self,port = 6633,listen =100):
-        sock = self.new_sock(0)
-        sock.bind(("", 6633))
-        sock.listen(listen)
+        listener = self.new_sock(0)
+        listener.bind(("", 6633))
+        listener.listen(listen)
 
         threads = []
+        sockets = []
+        sockets.append(listener)
 
-        t_connection = miracle_thread(func = self.connection_up, args =(sock,),name = "connection")
+        t_connection = miracle_thread(func = self.connection_up, args =(listener,sockets,),name = "connection")
         threads.append(t_connection)
         t_recv = miracle_thread(func=self.recv_message, args=(self.fd_map,self.message_queue_map),name = "recv_message") 
         threads.append(t_recv)
