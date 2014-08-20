@@ -5,7 +5,7 @@
 * Miracle defines the data structures of OpenFlow by Scapy.
 * Author: Licheng, Zhao Weichen
 
-##INSTALL
+##Install
 
 ###Tornado
 
