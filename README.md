@@ -5,17 +5,17 @@
 * Miracle defines the data structures of OpenFlow by Scapy.
 * Author: Licheng, Zhao Weichen
 
-##Install
+## Install
 
-###Tornado
+### Tornado
 
 	pip install tornado
 
-###Scapy
+### Scapy
 
 	apt-get install scapy
 
-##Getting Started
+## Getting Started
 	cd Miracle
 	python miracle.py
 
